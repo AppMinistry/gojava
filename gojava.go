@@ -3,7 +3,7 @@ Command gojava is a tool for creating Java bindings to Go packages.
 
 Usage
 
-	gojava [-v] [-o <jar>] [-s <dir>] build [<pkg1>, [<pkg2>...]]
+	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] build [<pkg1>, [<pkg2>...]]
 
 	This generates a jar containing Java bindings to the specified Go packages.
 
@@ -11,7 +11,9 @@ Usage
 	    Path to write the generated jar file. (default "libgojava.jar")
 	-s string
 	    Additional path to scan for Java source code. These files will be compiled and
-	    included in the final jar.
+			included in the final jar.
+	-p string
+			Optional package name to use instead of the default go.
 	-v  Verbose output.
 */
 package main
@@ -107,7 +109,7 @@ func createDirs(dirs ...string) error {
 	return nil
 }
 
-func bindPackages(bindDir, javaDir string, pkgs []*types.Package) ([]string, error) {
+func bindPackages(bindDir, javaDir, packageName string, pkgs []*types.Package) ([]string, error) {
 	fs, javaFiles := token.NewFileSet(), make([]string, 0)
 	for _, p := range pkgs {
 		goFile := filepath.Join(bindDir, "go_"+p.Name()+"main.go")
@@ -123,13 +125,13 @@ func bindPackages(bindDir, javaDir string, pkgs []*types.Package) ([]string, err
 			return nil, err
 		}
 		javaFile := strings.Title(p.Name()) + ".java"
-		if err := bindJava(javaDir, javaFile, conf, int(bind.Java)); err != nil {
+		if err := bindJava(javaDir, javaFile, packageName, conf, int(bind.Java)); err != nil {
 			return nil, err
 		}
-		if err := bindJava(bindDir, "java_"+p.Name()+".c", conf, int(bind.JavaC)); err != nil {
+		if err := bindJava(bindDir, "java_"+p.Name()+".c", packageName, conf, int(bind.JavaC)); err != nil {
 			return nil, err
 		}
-		if err := bindJava(bindDir, p.Name()+".h", conf, int(bind.JavaH)); err != nil {
+		if err := bindJava(bindDir, p.Name()+".h", packageName, conf, int(bind.JavaH)); err != nil {
 			return nil, err
 		}
 		javaFiles = append(javaFiles, filepath.Join(javaDir, javaFile))
@@ -283,7 +285,7 @@ func createJar(target, jarDir string) error {
 	return nil
 }
 
-func bindToJar(target string, sourceDir string, pkgs ...string) error {
+func bindToJar(target string, sourceDir string, packageName string, pkgs ...string) error {
 	tmpDir, cleanup, err := initBuild()
 	if err != nil {
 		return err
@@ -306,7 +308,7 @@ func bindToJar(target string, sourceDir string, pkgs ...string) error {
 		return err
 	}
 
-	javaFiles, err := bindPackages(bindDir, javaDir, typePkgs)
+	javaFiles, err := bindPackages(bindDir, javaDir, packageName, typePkgs)
 	if err != nil {
 		return err
 	}
@@ -350,7 +352,7 @@ func copyFiles(files []filePair) error {
 	return nil
 }
 
-func bindJava(dir, file string, conf *bind.GeneratorConfig, ft int) error {
+func bindJava(dir, file, packageName string, conf *bind.GeneratorConfig, ft int) error {
 	path := filepath.Join(dir, file)
 	w, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
@@ -361,11 +363,11 @@ func bindJava(dir, file string, conf *bind.GeneratorConfig, ft int) error {
 
 	switch ft {
 	case int(bind.Java):
-		err = bind.GenJava(conf, "", bind.Java)
+		err = bind.GenJava(conf, packageName, bind.Java)
 	case int(bind.JavaH):
-		err = bind.GenJava(conf, "", bind.JavaH)
+		err = bind.GenJava(conf, packageName, bind.JavaH)
 	case int(bind.JavaC):
-		err = bind.GenJava(conf, "", bind.JavaC)
+		err = bind.GenJava(conf, packageName, bind.JavaC)
 	default:
 		err = fmt.Errorf("unsupported bind type: %d", ft)
 	}
@@ -395,7 +397,7 @@ const usage = `gojava is a tool for creating Java bindings to Go
 
 Usage:
 
-	gojava [-v] [-o <jar>] [-s <dir>] build [<pkg1>, [<pkg2>...]]
+	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] build [<pkg1>, [<pkg2>...]]
 
 This generates a jar containing Java bindings to the specified Go packages.
 `
@@ -403,6 +405,7 @@ This generates a jar containing Java bindings to the specified Go packages.
 func main() {
 	o := flag.String("o", "libgojava.jar", "Path to the generated jar file.")
 	s := flag.String("s", "", "Additional path to scan for Java source code.")
+	p := flag.String("p", "", "Package name to use instead of default 'go'.")
 	flag.BoolVar(&verbose, "v", false, "Verbose output.")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, usage)
@@ -413,7 +416,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	if err := bindToJar(*o, *s, flag.Args()[1:]...); err != nil {
+	if err := bindToJar(*o, *s, *p, flag.Args()[1:]...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

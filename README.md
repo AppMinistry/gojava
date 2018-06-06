@@ -6,7 +6,7 @@ The same set of types are supported. Details on how the binding works can be fou
 ### Usage
 
 ```
-	gojava [-v] [-o <jar>] [-s <dir>] build [<pkg1>, [<pkg2>...]]
+	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] build [<pkg1>, [<pkg2>...]]
 
 	This generates a jar containing Java bindings to the specified Go packages.
 
@@ -15,6 +15,8 @@ The same set of types are supported. Details on how the binding works can be fou
 	-s string
 	    Additional path to scan for Java source code. These files will be compiled and
 	    included in the final jar.
+	-p string
+		Optional package name to use instead of the default go.
 	-v  Verbose output.
 ```
 
