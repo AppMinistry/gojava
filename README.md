@@ -6,7 +6,7 @@ The same set of types are supported. Details on how the binding works can be fou
 ### Usage
 
 ```
-	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] build [<pkg1>, [<pkg2>...]]
+	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] [-r <dir>] build [<pkg1>, [<pkg2>...]]
 
 	This generates a jar containing Java bindings to the specified Go packages.
 
@@ -17,6 +17,8 @@ The same set of types are supported. Details on how the binding works can be fou
 	    included in the final jar.
 	-p string
 		Optional package name to use instead of the default go.
+	-r string
+		Directory where LoadJNI.java file resides.
 	-v  Verbose output.
 ```
 

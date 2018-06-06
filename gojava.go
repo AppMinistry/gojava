@@ -3,7 +3,7 @@ Command gojava is a tool for creating Java bindings to Go packages.
 
 Usage
 
-	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] build [<pkg1>, [<pkg2>...]]
+	gojava [-v] [-o <jar>] [-s <dir>] [-p <package>] [-r <dir>] build [<pkg1>, [<pkg2>...]]
 
 	This generates a jar containing Java bindings to the specified Go packages.
 
@@ -14,6 +14,8 @@ Usage
 			included in the final jar.
 	-p string
 			Optional package name to use instead of the default go.
+	-r string
+			Directory where LoadJNI.java file resides.
 	-v  Verbose output.
 */
 package main
@@ -171,19 +173,24 @@ func addExtraFiles(javaDir, sourceDir string) ([]string, error) {
 	return extraFiles, nil
 }
 
-func createSupportFiles(bindDir, javaDir, mainFile string) error {
+func createSupportFiles(bindDir, javaDir, mainFile, localResourcesDir string) error {
 	bindPkg, err := build.Import(reflect.TypeOf(bind.ErrorList{}).PkgPath(), "", build.FindOnly)
 	if err != nil {
 		return err
 	}
 	bindJavaPkgDir := filepath.Join(bindPkg.Dir, "java")
+
+	if localResourcesDir == "" {
+		localResourcesDir = filepath.Join(bindJavaPkgDir, "..", "..", "gojava")
+	}
+
 	toCopy := []filePair{
 		{filepath.Join(bindDir, "seq.go"), filepath.Join(bindPkg.Dir, "seq.go.support")},
 		{filepath.Join(bindDir, "seq_java.go"), filepath.Join(bindJavaPkgDir, "seq_android.go.support")},
 		{filepath.Join(bindDir, "seq.c"), filepath.Join(bindJavaPkgDir, "seq_android.c.support")},
 		{filepath.Join(bindDir, "seq.h"), filepath.Join(bindJavaPkgDir, "seq.h")},
 		{filepath.Join(javaDir, "Seq.java"), filepath.Join(bindJavaPkgDir, "Seq.java")},
-		{filepath.Join(javaDir, "LoadJNI.java"), filepath.Join(bindPkg.Dir, "..", "..", "gojava", "LoadJNI.java")},
+		{filepath.Join(javaDir, "LoadJNI.java"), filepath.Join(localResourcesDir, "LoadJNI.java")},
 	}
 	if err := copyFiles(toCopy); err != nil {
 		return err
@@ -285,7 +292,7 @@ func createJar(target, jarDir string) error {
 	return nil
 }
 
-func bindToJar(target string, sourceDir string, packageName string, pkgs ...string) error {
+func bindToJar(target string, sourceDir string, packageName string, localResourcesDir string, pkgs ...string) error {
 	tmpDir, cleanup, err := initBuild()
 	if err != nil {
 		return err
@@ -317,7 +324,7 @@ func bindToJar(target string, sourceDir string, packageName string, pkgs ...stri
 		return err
 	}
 	javaFiles = append(javaFiles, extraFiles...)
-	if err := createSupportFiles(bindDir, javaDir, mainFile); err != nil {
+	if err := createSupportFiles(bindDir, javaDir, mainFile, localResourcesDir); err != nil {
 		return err
 	}
 
@@ -406,6 +413,7 @@ func main() {
 	o := flag.String("o", "libgojava.jar", "Path to the generated jar file.")
 	s := flag.String("s", "", "Additional path to scan for Java source code.")
 	p := flag.String("p", "", "Package name to use instead of default 'go'.")
+	r := flag.String("r", "", "Directory where LoadJNI.java file resides.")
 	flag.BoolVar(&verbose, "v", false, "Verbose output.")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, usage)
@@ -416,7 +424,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	if err := bindToJar(*o, *s, *p, flag.Args()[1:]...); err != nil {
+	if err := bindToJar(*o, *s, *p, *r, flag.Args()[1:]...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
